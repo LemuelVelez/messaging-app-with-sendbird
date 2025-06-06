@@ -7,9 +7,9 @@ import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { X, Upload } from "lucide-react"
+import { X, Camera, Upload } from "lucide-react"
 
 interface ProfileEditModalProps {
     currentUser: any
@@ -21,6 +21,7 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
     const [nickname, setNickname] = useState(currentUser?.nickname || "")
     const [profileUrl, setProfileUrl] = useState(currentUser?.profileUrl || "")
     const [isUploading, setIsUploading] = useState(false)
+    const [uploadProgress, setUploadProgress] = useState("")
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -40,6 +41,7 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
         }
 
         setIsUploading(true)
+        setUploadProgress("Uploading...")
 
         try {
             const formData = new FormData()
@@ -53,12 +55,17 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
             if (response.ok) {
                 const data = await response.json()
                 setProfileUrl(data.url)
+                setUploadProgress("Upload successful!")
+                setTimeout(() => setUploadProgress(""), 2000)
             } else {
-                alert("Failed to upload image")
+                const errorData = await response.json()
+                alert(`Failed to upload image: ${errorData.error || "Unknown error"}`)
+                setUploadProgress("")
             }
         } catch (error) {
             console.error("Error uploading image:", error)
             alert("Failed to upload image")
+            setUploadProgress("")
         } finally {
             setIsUploading(false)
         }
@@ -82,38 +89,49 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <Card className="w-full max-w-md mx-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <Card className="w-full max-w-md mx-auto shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Edit Profile</CardTitle>
-                    <Button variant="ghost" size="sm" onClick={onClose}>
+                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full cursor-pointer">
                         <X className="h-4 w-4" />
                     </Button>
                 </CardHeader>
                 <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-6">
                         <div className="flex flex-col items-center space-y-4">
-                            <Avatar className="w-20 h-20">
-                                <AvatarImage src={profileUrl || "/placeholder.svg"} alt={nickname} />
-                                <AvatarFallback>{nickname.charAt(0).toUpperCase()}</AvatarFallback>
-                            </Avatar>
-
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => fileInputRef.current?.click()}
-                                disabled={isUploading}
-                            >
-                                <Upload className="h-4 w-4 mr-2" />
-                                {isUploading ? "Uploading..." : "Change Photo"}
-                            </Button>
+                            <div className="relative">
+                                <Avatar className="w-24 h-24 border-2 border-primary">
+                                    <AvatarImage src={profileUrl || "/placeholder.svg?height=96&width=96"} alt={nickname} />
+                                    <AvatarFallback className="text-xl">{nickname.charAt(0).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="icon"
+                                    className="absolute bottom-0 right-0 rounded-full shadow-md cursor-pointer"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    disabled={isUploading}
+                                >
+                                    {isUploading ? <Upload className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
+                                </Button>
+                            </div>
 
                             <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+
+                            {uploadProgress && (
+                                <div
+                                    className={`text-sm ${uploadProgress.includes("successful") ? "text-green-600" : "text-muted-foreground"}`}
+                                >
+                                    {uploadProgress}
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="nickname">Nickname</Label>
+                            <Label htmlFor="nickname" className="text-sm font-medium">
+                                Nickname
+                            </Label>
                             <Input
                                 id="nickname"
                                 value={nickname}
@@ -121,20 +139,20 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
                                 placeholder="Enter your nickname"
                                 maxLength={20}
                                 required
+                                className="rounded-md"
                             />
-                            <p className="text-sm text-gray-500">3-20 characters, letters, numbers, and spaces only</p>
-                        </div>
-
-                        <div className="flex space-x-2">
-                            <Button type="button" variant="outline" onClick={onClose} className="flex-1">
-                                Cancel
-                            </Button>
-                            <Button type="submit" className="flex-1">
-                                Save Changes
-                            </Button>
+                            <p className="text-xs text-muted-foreground">3-20 characters, letters, numbers, and spaces only</p>
                         </div>
                     </form>
                 </CardContent>
+                <CardFooter className="flex justify-end space-x-2 border-t pt-4">
+                    <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer">
+                        Cancel
+                    </Button>
+                    <Button type="submit" onClick={handleSubmit} className="cursor-pointer">
+                        Save Changes
+                    </Button>
+                </CardFooter>
             </Card>
         </div>
     )

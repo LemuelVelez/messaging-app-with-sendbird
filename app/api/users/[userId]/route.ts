@@ -1,7 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/db"
 
-export async function PUT(request: NextRequest, { params }: { params: { userId: string } }) {
+interface Params {
+  userId: string
+}
+
+export async function PUT(request: NextRequest, { params }: { params: Params }) {
   try {
     const { nickname, profile_url } = await request.json()
     const userId = params.userId
@@ -29,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: { userId: 
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: { userId: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Params }) {
   try {
     const userId = params.userId
 
