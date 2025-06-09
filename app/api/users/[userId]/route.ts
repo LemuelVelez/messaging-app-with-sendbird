@@ -5,10 +5,10 @@ interface Params {
   userId: string
 }
 
-export async function PUT(request: NextRequest, { params }: { params: Params }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<Params> }) {
   try {
     const { nickname, profile_url } = await request.json()
-    const userId = params.userId
+    const { userId } = await params
 
     const query = `
       UPDATE users 
@@ -33,9 +33,9 @@ export async function PUT(request: NextRequest, { params }: { params: Params }) 
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: Params }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<Params> }) {
   try {
-    const userId = params.userId
+    const { userId } = await params
 
     const query = `
       SELECT * FROM users 

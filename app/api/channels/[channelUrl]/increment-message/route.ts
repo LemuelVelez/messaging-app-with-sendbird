@@ -5,12 +5,8 @@ interface Params {
   channelUrl: string
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<Params> }, // Updated type signature
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<Params> }) {
   try {
-    // Await the params Promise to get the actual values
     const { channelUrl } = await params
     const decodedChannelUrl = decodeURIComponent(channelUrl)
 

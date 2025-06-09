@@ -5,9 +5,10 @@ interface Params {
   channelUrl: string
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Params }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<Params> }) {
   try {
-    const channelUrl = decodeURIComponent(params.channelUrl)
+    const { channelUrl } = await params
+    const decodedChannelUrl = decodeURIComponent(channelUrl)
 
     const query = `
       UPDATE channels 
@@ -16,7 +17,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       RETURNING *
     `
 
-    const result = await pool.query(query, [channelUrl])
+    const result = await pool.query(query, [decodedChannelUrl])
 
     if (result.rows.length === 0) {
       return NextResponse.json({ success: false, error: "Channel not found" }, { status: 404 })
@@ -32,9 +33,10 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: Params }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<Params> }) {
   try {
-    const channelUrl = decodeURIComponent(params.channelUrl)
+    const { channelUrl } = await params
+    const decodedChannelUrl = decodeURIComponent(channelUrl)
 
     const query = `
       SELECT c.*, 
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
       WHERE c.channel_url = $1
     `
 
-    const result = await pool.query(query, [channelUrl])
+    const result = await pool.query(query, [decodedChannelUrl])
 
     if (result.rows.length === 0) {
       return NextResponse.json({ success: false, error: "Channel not found" }, { status: 404 })
