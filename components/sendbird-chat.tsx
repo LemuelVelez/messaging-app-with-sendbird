@@ -18,7 +18,6 @@ export default function SendbirdChat() {
     const [showSettings, setShowSettings] = useState(false)
     const [isConnected, setIsConnected] = useState(false)
     const [showCreateChannel, setShowCreateChannel] = useState(false)
-    const [isLoading, setIsLoading] = useState(false)
 
     const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID || "295F96EE-5F91-4352-BF0E-DE1823C8A496"
     const userId = process.env.NEXT_PUBLIC_SENDBIRD_USER_ID || "John Doe"
@@ -27,11 +26,8 @@ export default function SendbirdChat() {
     // Create user in database when component mounts
     useEffect(() => {
         const createUserInDatabase = async () => {
-            if (!isConnected) return
-
-            setIsLoading(true)
             try {
-                const response = await fetch("/api/users", {
+                await fetch("/api/users", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -42,16 +38,9 @@ export default function SendbirdChat() {
                         profile_url: "",
                     }),
                 })
-
-                if (!response.ok) {
-                    throw new Error("Failed to create user in database")
-                }
-
                 console.log("User created/updated in database")
             } catch (error) {
                 console.error("Error creating user in database:", error)
-            } finally {
-                setIsLoading(false)
             }
         }
 
@@ -66,10 +55,9 @@ export default function SendbirdChat() {
 
     const handleProfileUpdate = useCallback(
         async (nickname: string, profileUrl: string) => {
-            setIsLoading(true)
             try {
                 // Update in database first
-                const response = await fetch(`/api/users/${encodeURIComponent(userId)}`, {
+                const response = await fetch(`/api/users/${userId}`, {
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
@@ -109,8 +97,6 @@ export default function SendbirdChat() {
             } catch (error) {
                 console.error("Error updating user profile:", error)
                 alert("Failed to update profile. Please try again.")
-            } finally {
-                setIsLoading(false)
             }
         },
         [userId, currentUser],
@@ -153,7 +139,6 @@ export default function SendbirdChat() {
                 return
             }
 
-            setIsLoading(true)
             // Save channel to database with proper error handling
             try {
                 // Safely extract chatmate ID with null checks
@@ -184,8 +169,6 @@ export default function SendbirdChat() {
                 }
             } catch (error) {
                 console.error("Error saving channel to database:", error)
-            } finally {
-                setIsLoading(false)
             }
         },
         [userId],
@@ -204,12 +187,15 @@ export default function SendbirdChat() {
                 }
 
                 try {
-                    // Update message count in database using the fixed route
-                    const countResponse = await fetch(`/api/channels/${encodeURIComponent(channel.url)}/increment-message`, {
-                        method: "POST",
+                    // Update message count in database
+                    const countResponse = await fetch("/api/channels/message-count", {
+                        method: "PUT",
                         headers: {
                             "Content-Type": "application/json",
                         },
+                        body: JSON.stringify({
+                            channel_url: channel.url,
+                        }),
                     })
 
                     if (!countResponse.ok) {
@@ -374,7 +360,7 @@ export default function SendbirdChat() {
                                         ? "Select a conversation or create a new one to start chatting"
                                         : "Connecting to chat service..."}
                                 </p>
-                                {(!isConnected || isLoading) && (
+                                {!isConnected && (
                                     <div className="loading-animation">
                                         <div></div>
                                         <div></div>
@@ -398,7 +384,6 @@ export default function SendbirdChat() {
                     currentUser={currentUser}
                     onClose={() => setShowProfileModal(false)}
                     onUpdate={handleProfileUpdate}
-                    isLoading={isLoading}
                 />
             )}
         </>
