@@ -1,14 +1,9 @@
 import { Pool } from "pg";
 
-// Fix the database connection to use individual parameters
 const pool = new Pool({
-  host: process.env.DB_HOST,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  port: Number.parseInt(process.env.DB_PORT || "5432"),
+  connectionString: process.env.POSTGRES_URL, // Use environment variable for connection string
   ssl: {
-    rejectUnauthorized: false,
+    rejectUnauthorized: false, // For development; consider proper certificate validation in production
   },
 });
 

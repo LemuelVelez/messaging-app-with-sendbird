@@ -5,9 +5,14 @@ interface Params {
   channelUrl: string
 }
 
-export async function POST(request: NextRequest, { params }: { params: Params }) {
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<Params> }, // Updated type signature
+) {
   try {
-    const channelUrl = decodeURIComponent(params.channelUrl)
+    // Await the params Promise to get the actual values
+    const { channelUrl } = await params
+    const decodedChannelUrl = decodeURIComponent(channelUrl)
 
     const query = `
       UPDATE channels 
@@ -16,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: Params })
       RETURNING *
     `
 
-    const result = await pool.query(query, [channelUrl])
+    const result = await pool.query(query, [decodedChannelUrl])
 
     if (result.rows.length === 0) {
       return NextResponse.json({ success: false, error: "Channel not found" }, { status: 404 })
