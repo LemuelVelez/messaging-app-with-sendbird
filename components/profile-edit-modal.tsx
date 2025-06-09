@@ -9,15 +9,16 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { X, Camera, Upload } from "lucide-react"
+import { X, Camera, Upload, Loader2 } from "lucide-react"
 
 interface ProfileEditModalProps {
     currentUser: any
     onClose: () => void
     onUpdate: (nickname: string, profileUrl: string) => void
+    isLoading?: boolean
 }
 
-export default function ProfileEditModal({ currentUser, onClose, onUpdate }: ProfileEditModalProps) {
+export default function ProfileEditModal({ currentUser, onClose, onUpdate, isLoading = false }: ProfileEditModalProps) {
     const [nickname, setNickname] = useState(currentUser?.nickname || "")
     const [profileUrl, setProfileUrl] = useState(currentUser?.profileUrl || "")
     const [isUploading, setIsUploading] = useState(false)
@@ -102,7 +103,13 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
             <Card className="w-full max-w-md mx-auto shadow-lg">
                 <CardHeader className="flex flex-row items-center justify-between">
                     <CardTitle>Edit Profile</CardTitle>
-                    <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full cursor-pointer">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onClose}
+                        className="rounded-full cursor-pointer"
+                        disabled={isUpdating || isLoading}
+                    >
                         <X className="h-4 w-4" />
                     </Button>
                 </CardHeader>
@@ -120,7 +127,7 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
                                     size="icon"
                                     className="absolute bottom-0 right-0 rounded-full shadow-md cursor-pointer"
                                     onClick={() => fileInputRef.current?.click()}
-                                    disabled={isUploading}
+                                    disabled={isUploading || isUpdating || isLoading}
                                 >
                                     {isUploading ? <Upload className="h-4 w-4 animate-spin" /> : <Camera className="h-4 w-4" />}
                                 </Button>
@@ -149,18 +156,36 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
                                 maxLength={20}
                                 required
                                 className="rounded-md"
-                                disabled={isUpdating}
+                                disabled={isUpdating || isLoading}
                             />
                             <p className="text-xs text-muted-foreground">3-20 characters, letters, numbers, and spaces only</p>
                         </div>
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-end space-x-2 border-t pt-4">
-                    <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer" disabled={isUpdating}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        onClick={onClose}
+                        className="cursor-pointer"
+                        disabled={isUpdating || isLoading}
+                    >
                         Cancel
                     </Button>
-                    <Button type="submit" onClick={handleSubmit} className="cursor-pointer" disabled={isUpdating || isUploading}>
-                        {isUpdating ? "Saving..." : "Save Changes"}
+                    <Button
+                        type="submit"
+                        onClick={handleSubmit}
+                        className="cursor-pointer"
+                        disabled={isUpdating || isUploading || isLoading}
+                    >
+                        {isUpdating || isLoading ? (
+                            <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Saving...
+                            </>
+                        ) : (
+                            "Save Changes"
+                        )}
                     </Button>
                 </CardFooter>
             </Card>

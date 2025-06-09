@@ -5,11 +5,12 @@ import "@sendbird/uikit-react/dist/index.css"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
 import { AuthProvider, useAuth } from "@/components/auth-wrapper"
+import LoadingSpinner from "@/components/loading-spinner"
 
 function ChatApp() {
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme } = useTheme()
-  const { user } = useAuth()
+  const { user, isLoading } = useAuth()
 
   const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID || ""
   const accessToken = process.env.NEXT_PUBLIC_SENDBIRD_ACCESS_TOKEN || ""
@@ -46,14 +47,18 @@ function ChatApp() {
     }
   }, [user, mounted])
 
-  if (!mounted || !user) {
+  if (!mounted || isLoading) {
     return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="loading-animation">
-          <div></div>
-          <div></div>
-          <div></div>
-        </div>
+      <div className="flex items-center justify-center h-screen bg-background">
+        <LoadingSpinner size="lg" text="Loading chat..." />
+      </div>
+    )
+  }
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-background">
+        <p className="text-muted-foreground">Please sign in to continue</p>
       </div>
     )
   }

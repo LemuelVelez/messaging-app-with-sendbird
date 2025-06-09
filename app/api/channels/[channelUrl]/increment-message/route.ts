@@ -1,11 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/db"
 
-interface Params {
-  channelUrl: string
-}
-
-export async function POST(request: NextRequest, { params }: { params: Params }) {
+export async function POST(request: NextRequest, { params }: { params: { channelUrl: string } }) {
   try {
     const channelUrl = decodeURIComponent(params.channelUrl)
 

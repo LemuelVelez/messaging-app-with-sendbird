@@ -1,11 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import pool from "@/lib/db"
 
-interface Params {
-  channelUrl: string
-}
-
-export async function DELETE(request: NextRequest, { params }: { params: Params }) {
+export async function DELETE(request: NextRequest, { params }: { params: { channelUrl: string } }) {
   try {
     const channelUrl = decodeURIComponent(params.channelUrl)
 
@@ -32,7 +28,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
   }
 }
 
-export async function GET(request: NextRequest, { params }: { params: Params }) {
+export async function GET(request: NextRequest, { params }: { params: { channelUrl: string } }) {
   try {
     const channelUrl = decodeURIComponent(params.channelUrl)
 
