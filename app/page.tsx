@@ -4,13 +4,14 @@ import { App as SendbirdApp } from "@sendbird/uikit-react"
 import "@sendbird/uikit-react/dist/index.css"
 import { useTheme } from "next-themes"
 import { useEffect, useState } from "react"
+import { AuthProvider, useAuth } from "@/components/auth-wrapper"
 
-export default function Page() {
+function ChatApp() {
   const [mounted, setMounted] = useState(false)
   const { resolvedTheme } = useTheme()
+  const { user } = useAuth()
 
   const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID || ""
-  const userId = process.env.NEXT_PUBLIC_SENDBIRD_USER_ID || ""
   const accessToken = process.env.NEXT_PUBLIC_SENDBIRD_ACCESS_TOKEN || ""
 
   useEffect(() => {
@@ -20,6 +21,8 @@ export default function Page() {
   // Create user in database when component mounts
   useEffect(() => {
     const createUserInDatabase = async () => {
+      if (!user) return
+
       try {
         await fetch("/api/users", {
           method: "POST",
@@ -27,8 +30,8 @@ export default function Page() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            user_id: userId,
-            nickname: userId,
+            user_id: user.id,
+            nickname: user.nickname,
             profile_url: "",
           }),
         })
@@ -38,19 +41,30 @@ export default function Page() {
       }
     }
 
-    if (mounted && userId) {
+    if (mounted && user) {
       createUserInDatabase()
     }
-  }, [userId, mounted])
+  }, [user, mounted])
+
+  if (!mounted || !user) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="loading-animation">
+          <div></div>
+          <div></div>
+          <div></div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="relative w-full h-screen overflow-hidden">
-
       {/* SendBird App */}
       <div className="w-full h-full">
         <SendbirdApp
           appId={appId}
-          userId={userId}
+          userId={user.id}
           accessToken={accessToken}
           theme={resolvedTheme === "dark" ? "dark" : "light"}
           showSearchIcon={true}
@@ -65,5 +79,13 @@ export default function Page() {
         />
       </div>
     </div>
+  )
+}
+
+export default function Page() {
+  return (
+    <AuthProvider>
+      <ChatApp />
+    </AuthProvider>
   )
 }

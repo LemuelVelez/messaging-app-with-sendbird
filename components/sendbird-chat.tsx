@@ -10,6 +10,8 @@ import "@sendbird/uikit-react/dist/index.css"
 import ProfileEditModal from "./profile-edit-modal"
 import CustomHeader from "./custom-header"
 import type { User } from "@sendbird/chat"
+import SendBird from "@sendbird/chat"
+import type { GroupChannelModule } from "@sendbird/chat/groupChannel"
 
 export default function SendbirdChat() {
     const [showProfileModal, setShowProfileModal] = useState(false)
@@ -18,10 +20,119 @@ export default function SendbirdChat() {
     const [showSettings, setShowSettings] = useState(false)
     const [isConnected, setIsConnected] = useState(false)
     const [showCreateChannel, setShowCreateChannel] = useState(false)
+    const [sbInstance, setSbInstance] = useState<SendBird | null>(null)
 
     const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID || "295F96EE-5F91-4352-BF0E-DE1823C8A496"
     const userId = process.env.NEXT_PUBLIC_SENDBIRD_USER_ID || "John Doe"
     const accessToken = process.env.NEXT_PUBLIC_SENDBIRD_ACCESS_TOKEN || "4a5acb402901976e94f1835c930198e210c9cb4f"
+
+    // Initialize SendBird and set up event handlers
+    useEffect(() => {
+        const initSendBird = async () => {
+            try {
+                const sb = SendBird.init({
+                    appId: appId,
+                    modules: [new (await import("@sendbird/chat/groupChannel")).GroupChannelModule()],
+                }) as SendBird & GroupChannelModule
+
+                setSbInstance(sb)
+
+                // Set up channel event handlers
+                const channelHandler = new sb.groupChannel.GroupChannelHandler()
+
+                // Handle channel creation
+                channelHandler.onChannelCreated = async (context, channel) => {
+                    console.log("Channel created event:", channel)
+
+                    try {
+                        const chatmateId = channel.members?.find((member: any) => member.userId !== userId)?.userId || null
+
+                        await fetch("/api/channels", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                channel_url: channel.url,
+                                created_by: userId,
+                                chatmate_id: chatmateId,
+                                message_count: 0,
+                            }),
+                        })
+                        console.log("Channel saved to database")
+                    } catch (error) {
+                        console.error("Error saving channel to database:", error)
+                    }
+                }
+
+                // Handle message sent (to update message count)
+                channelHandler.onMessageReceived = async (channel, message) => {
+                    console.log("Message received:", message)
+
+                    try {
+                        await fetch(`/api/channels/${channel.url}/increment-message`, {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                        })
+                    } catch (error) {
+                        console.error("Error updating message count:", error)
+                    }
+                }
+
+                // Handle channel deleted
+                channelHandler.onChannelDeleted = async (channelUrl) => {
+                    console.log("Channel deleted:", channelUrl)
+
+                    try {
+                        await fetch(`/api/channels/${channelUrl}`, {
+                            method: "DELETE",
+                        })
+                    } catch (error) {
+                        console.error("Error marking channel as deleted:", error)
+                    }
+                }
+
+                sb.groupChannel.addGroupChannelHandler("CHANNEL_HANDLER", channelHandler)
+
+                // Set up user event handlers
+                const userHandler = new sb.UserEventHandler()
+
+                userHandler.onUserUpdated = async (user) => {
+                    console.log("User updated:", user)
+
+                    try {
+                        await fetch(`/api/users/${user.userId}`, {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
+                                nickname: user.nickname,
+                                profile_url: user.profileUrl,
+                            }),
+                        })
+                    } catch (error) {
+                        console.error("Error updating user in database:", error)
+                    }
+                }
+
+                sb.addUserEventHandler("USER_HANDLER", userHandler)
+            } catch (error) {
+                console.error("Error initializing SendBird:", error)
+            }
+        }
+
+        initSendBird()
+
+        return () => {
+            if (sbInstance) {
+                sbInstance.groupChannel.removeGroupChannelHandler("CHANNEL_HANDLER")
+                sbInstance.removeUserEventHandler("USER_HANDLER")
+            }
+        }
+    }, [appId, userId])
 
     // Create user in database when component mounts
     useEffect(() => {
@@ -68,19 +179,13 @@ export default function SendbirdChat() {
                 })
 
                 // Update SendBird user profile
-                if (currentUser) {
+                if (sbInstance && currentUser) {
                     try {
-                        // Access SendBird SDK to update user profile
-                        const { default: SendBird } = await import("@sendbird/chat")
-                        const sb = SendBird.instance
-
-                        if (sb) {
-                            await sb.updateCurrentUserInfo({
-                                nickname,
-                                profileUrl,
-                            })
-                            console.log("SendBird profile updated successfully")
-                        }
+                        await sbInstance.updateCurrentUserInfo({
+                            nickname,
+                            profileUrl,
+                        })
+                        console.log("SendBird profile updated successfully")
                     } catch (sbError) {
                         console.error("Error updating SendBird profile:", sbError)
                     }
@@ -93,7 +198,7 @@ export default function SendbirdChat() {
                 console.error("Error updating user profile:", error)
             }
         },
-        [userId, currentUser],
+        [userId, currentUser, sbInstance],
     )
 
     // Enhanced channel select handler with better error handling
