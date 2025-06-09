@@ -1,5 +1,6 @@
 import { Pool } from "pg";
 
+// Fix the database connection to use individual parameters
 const pool = new Pool({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,

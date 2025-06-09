@@ -10,8 +10,6 @@ import "@sendbird/uikit-react/dist/index.css"
 import ProfileEditModal from "./profile-edit-modal"
 import CustomHeader from "./custom-header"
 import type { User } from "@sendbird/chat"
-import SendBird from "@sendbird/chat"
-import type { GroupChannelModule } from "@sendbird/chat/groupChannel"
 
 export default function SendbirdChat() {
     const [showProfileModal, setShowProfileModal] = useState(false)
@@ -20,119 +18,10 @@ export default function SendbirdChat() {
     const [showSettings, setShowSettings] = useState(false)
     const [isConnected, setIsConnected] = useState(false)
     const [showCreateChannel, setShowCreateChannel] = useState(false)
-    const [sbInstance, setSbInstance] = useState<SendBird | null>(null)
 
     const appId = process.env.NEXT_PUBLIC_SENDBIRD_APP_ID || "295F96EE-5F91-4352-BF0E-DE1823C8A496"
     const userId = process.env.NEXT_PUBLIC_SENDBIRD_USER_ID || "John Doe"
     const accessToken = process.env.NEXT_PUBLIC_SENDBIRD_ACCESS_TOKEN || "4a5acb402901976e94f1835c930198e210c9cb4f"
-
-    // Initialize SendBird and set up event handlers
-    useEffect(() => {
-        const initSendBird = async () => {
-            try {
-                const sb = SendBird.init({
-                    appId: appId,
-                    modules: [new (await import("@sendbird/chat/groupChannel")).GroupChannelModule()],
-                }) as SendBird & GroupChannelModule
-
-                setSbInstance(sb)
-
-                // Set up channel event handlers
-                const channelHandler = new sb.groupChannel.GroupChannelHandler()
-
-                // Handle channel creation
-                channelHandler.onChannelCreated = async (context, channel) => {
-                    console.log("Channel created event:", channel)
-
-                    try {
-                        const chatmateId = channel.members?.find((member: any) => member.userId !== userId)?.userId || null
-
-                        await fetch("/api/channels", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                                channel_url: channel.url,
-                                created_by: userId,
-                                chatmate_id: chatmateId,
-                                message_count: 0,
-                            }),
-                        })
-                        console.log("Channel saved to database")
-                    } catch (error) {
-                        console.error("Error saving channel to database:", error)
-                    }
-                }
-
-                // Handle message sent (to update message count)
-                channelHandler.onMessageReceived = async (channel, message) => {
-                    console.log("Message received:", message)
-
-                    try {
-                        await fetch(`/api/channels/${channel.url}/increment-message`, {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                        })
-                    } catch (error) {
-                        console.error("Error updating message count:", error)
-                    }
-                }
-
-                // Handle channel deleted
-                channelHandler.onChannelDeleted = async (channelUrl) => {
-                    console.log("Channel deleted:", channelUrl)
-
-                    try {
-                        await fetch(`/api/channels/${channelUrl}`, {
-                            method: "DELETE",
-                        })
-                    } catch (error) {
-                        console.error("Error marking channel as deleted:", error)
-                    }
-                }
-
-                sb.groupChannel.addGroupChannelHandler("CHANNEL_HANDLER", channelHandler)
-
-                // Set up user event handlers
-                const userHandler = new sb.UserEventHandler()
-
-                userHandler.onUserUpdated = async (user) => {
-                    console.log("User updated:", user)
-
-                    try {
-                        await fetch(`/api/users/${user.userId}`, {
-                            method: "PUT",
-                            headers: {
-                                "Content-Type": "application/json",
-                            },
-                            body: JSON.stringify({
-                                nickname: user.nickname,
-                                profile_url: user.profileUrl,
-                            }),
-                        })
-                    } catch (error) {
-                        console.error("Error updating user in database:", error)
-                    }
-                }
-
-                sb.addUserEventHandler("USER_HANDLER", userHandler)
-            } catch (error) {
-                console.error("Error initializing SendBird:", error)
-            }
-        }
-
-        initSendBird()
-
-        return () => {
-            if (sbInstance) {
-                sbInstance.groupChannel.removeGroupChannelHandler("CHANNEL_HANDLER")
-                sbInstance.removeUserEventHandler("USER_HANDLER")
-            }
-        }
-    }, [appId, userId])
 
     // Create user in database when component mounts
     useEffect(() => {
@@ -149,6 +38,7 @@ export default function SendbirdChat() {
                         profile_url: "",
                     }),
                 })
+                console.log("User created/updated in database")
             } catch (error) {
                 console.error("Error creating user in database:", error)
             }
@@ -166,8 +56,8 @@ export default function SendbirdChat() {
     const handleProfileUpdate = useCallback(
         async (nickname: string, profileUrl: string) => {
             try {
-                // Update in database
-                await fetch(`/api/users/${userId}`, {
+                // Update in database first
+                const response = await fetch(`/api/users/${userId}`, {
                     method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
@@ -178,14 +68,24 @@ export default function SendbirdChat() {
                     }),
                 })
 
+                if (!response.ok) {
+                    throw new Error("Failed to update user in database")
+                }
+
                 // Update SendBird user profile
-                if (sbInstance && currentUser) {
+                if (currentUser) {
                     try {
-                        await sbInstance.updateCurrentUserInfo({
-                            nickname,
-                            profileUrl,
-                        })
-                        console.log("SendBird profile updated successfully")
+                        // Access SendBird SDK to update user profile
+                        const { default: SendBird } = await import("@sendbird/chat")
+                        const sb = SendBird.instance
+
+                        if (sb) {
+                            await sb.updateCurrentUserInfo({
+                                nickname,
+                                profileUrl,
+                            })
+                            console.log("SendBird profile updated successfully")
+                        }
                     } catch (sbError) {
                         console.error("Error updating SendBird profile:", sbError)
                     }
@@ -196,9 +96,10 @@ export default function SendbirdChat() {
                 window.location.reload()
             } catch (error) {
                 console.error("Error updating user profile:", error)
+                alert("Failed to update profile. Please try again.")
             }
         },
-        [userId, currentUser, sbInstance],
+        [userId, currentUser],
     )
 
     // Enhanced channel select handler with better error handling
@@ -238,11 +139,16 @@ export default function SendbirdChat() {
                 return
             }
 
-            // Save channel to database
+            // Save channel to database with proper error handling
             try {
-                const chatmateId = channel.members?.find((member: any) => member.userId !== userId)?.userId || null
+                // Safely extract chatmate ID with null checks
+                let chatmateId = null
+                if (channel.members && Array.isArray(channel.members)) {
+                    const chatmate = channel.members.find((member: any) => member?.userId && member.userId !== userId)
+                    chatmateId = chatmate?.userId || null
+                }
 
-                await fetch("/api/channels", {
+                const response = await fetch("/api/channels", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -254,12 +160,101 @@ export default function SendbirdChat() {
                         message_count: 0,
                     }),
                 })
+
+                if (response.ok) {
+                    console.log("Channel saved to database successfully")
+                } else {
+                    const errorData = await response.json()
+                    console.error("Failed to save channel to database:", errorData)
+                }
             } catch (error) {
                 console.error("Error saving channel to database:", error)
             }
         },
         [userId],
     )
+
+    // Enhanced message tracking through Sendbird events with better error handling
+    const handleSendbirdEvents = useCallback(() => {
+        return {
+            onMessageReceived: async (channel: any, message: any) => {
+                console.log("Message received:", { channel: channel?.url, message })
+
+                // Validate inputs
+                if (!channel?.url || !message) {
+                    console.warn("Invalid message received event data")
+                    return
+                }
+
+                try {
+                    // Update message count in database
+                    const countResponse = await fetch("/api/channels/message-count", {
+                        method: "PUT",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            channel_url: channel.url,
+                        }),
+                    })
+
+                    if (!countResponse.ok) {
+                        console.warn("Failed to update message count")
+                    }
+
+                    // Track message event
+                    const eventResponse = await fetch("/api/message-events", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            channel_url: channel.url,
+                            user_id: message.sender?.userId || userId,
+                            message_type: message.messageType || "user",
+                        }),
+                    })
+
+                    if (!eventResponse.ok) {
+                        console.warn("Failed to track message event")
+                    }
+                } catch (error) {
+                    console.error("Error tracking received message:", error)
+                }
+            },
+            onMessageUpdated: async (channel: any, message: any) => {
+                console.log("Message updated:", { channel: channel?.url, message })
+                // Track message updates if needed
+            },
+            onChannelDeleted: async (channelUrl: string) => {
+                console.log("Channel deleted:", channelUrl)
+
+                // Clear current channel if it's the one being deleted
+                if (currentChannel === channelUrl) {
+                    setCurrentChannel(null)
+                    setShowSettings(false)
+                }
+
+                // Mark channel as deleted in database
+                try {
+                    await fetch(`/api/channels/${encodeURIComponent(channelUrl)}`, {
+                        method: "DELETE",
+                    })
+                } catch (error) {
+                    console.error("Error marking channel as deleted:", error)
+                }
+            },
+            onUserLeft: async (channel: any, user: any) => {
+                console.log("User left channel:", { channel: channel?.url, user })
+
+                // If current user left, clear the channel
+                if (user?.userId === userId && currentChannel === channel?.url) {
+                    setCurrentChannel(null)
+                    setShowSettings(false)
+                }
+            },
+        }
+    }, [userId, currentChannel])
 
     const handleCreateChannelClick = useCallback(() => {
         setShowCreateChannel(true)
@@ -277,7 +272,7 @@ export default function SendbirdChat() {
         )
     }, [handleProfileClick, handleCreateChannelClick])
 
-    // Connection event handlers
+    // Enhanced connection event handlers
     const connectionHandlers = {
         onConnected: (user: User) => {
             console.log("User connected:", user)
@@ -287,6 +282,7 @@ export default function SendbirdChat() {
         onDisconnected: () => {
             console.log("User disconnected")
             setIsConnected(false)
+            setCurrentChannel(null) // Clear channel on disconnect
         },
         onReconnectStarted: () => {
             console.log("Reconnection started")
@@ -298,6 +294,7 @@ export default function SendbirdChat() {
         onReconnectFailed: () => {
             console.log("Reconnection failed")
             setIsConnected(false)
+            setCurrentChannel(null) // Clear channel on failed reconnect
         },
     }
 
@@ -318,6 +315,7 @@ export default function SendbirdChat() {
                     }}
                     eventHandlers={{
                         connection: connectionHandlers,
+                        ...handleSendbirdEvents(),
                     }}
                 >
                     <div className="w-full md:w-80 h-full border-r border-border">

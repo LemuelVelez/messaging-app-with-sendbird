@@ -48,3 +48,23 @@ $$ language 'plpgsql';
 CREATE TRIGGER update_channel_last_message_trigger
     AFTER INSERT ON messages
     FOR EACH ROW EXECUTE FUNCTION update_channel_last_message();
+
+
+-- Additional database improvements
+-- Add indexes for better performance if not exists
+CREATE INDEX IF NOT EXISTS idx_users_nickname ON users (nickname);
+CREATE INDEX IF NOT EXISTS idx_channels_message_count ON channels (message_count);
+
+-- Add a messages tracking table for better analytics
+CREATE TABLE IF NOT EXISTS message_events (
+    id SERIAL PRIMARY KEY,
+    channel_url VARCHAR(255) NOT NULL,
+    user_id VARCHAR(255) NOT NULL,
+    message_type VARCHAR(50) DEFAULT 'user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (channel_url) REFERENCES channels (channel_url),
+    FOREIGN KEY (user_id) REFERENCES users (user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_message_events_channel ON message_events (channel_url);
+CREATE INDEX IF NOT EXISTS idx_message_events_user ON message_events (user_id);

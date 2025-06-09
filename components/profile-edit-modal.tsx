@@ -22,6 +22,7 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
     const [profileUrl, setProfileUrl] = useState(currentUser?.profileUrl || "")
     const [isUploading, setIsUploading] = useState(false)
     const [uploadProgress, setUploadProgress] = useState("")
+    const [isUpdating, setIsUpdating] = useState(false)
     const fileInputRef = useRef<HTMLInputElement>(null)
 
     const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -71,7 +72,7 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
         }
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
 
         // Validate nickname (3-20 characters, alphanumeric and spaces only)
@@ -85,7 +86,15 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
             return
         }
 
-        onUpdate(nickname, profileUrl)
+        setIsUpdating(true)
+        try {
+            await onUpdate(nickname, profileUrl)
+        } catch (error) {
+            console.error("Error updating profile:", error)
+            alert("Failed to update profile. Please try again.")
+        } finally {
+            setIsUpdating(false)
+        }
     }
 
     return (
@@ -140,17 +149,18 @@ export default function ProfileEditModal({ currentUser, onClose, onUpdate }: Pro
                                 maxLength={20}
                                 required
                                 className="rounded-md"
+                                disabled={isUpdating}
                             />
                             <p className="text-xs text-muted-foreground">3-20 characters, letters, numbers, and spaces only</p>
                         </div>
                     </form>
                 </CardContent>
                 <CardFooter className="flex justify-end space-x-2 border-t pt-4">
-                    <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer">
+                    <Button type="button" variant="outline" onClick={onClose} className="cursor-pointer" disabled={isUpdating}>
                         Cancel
                     </Button>
-                    <Button type="submit" onClick={handleSubmit} className="cursor-pointer">
-                        Save Changes
+                    <Button type="submit" onClick={handleSubmit} className="cursor-pointer" disabled={isUpdating || isUploading}>
+                        {isUpdating ? "Saving..." : "Save Changes"}
                     </Button>
                 </CardFooter>
             </Card>

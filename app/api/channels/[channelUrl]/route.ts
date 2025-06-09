@@ -27,7 +27,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Params 
       channel: result.rows[0],
     })
   } catch (error) {
-    console.error("Error deleting channel:", error)
+    console.error("Error marking channel as deleted:", error)
     return NextResponse.json({ success: false, error: "Failed to delete channel" }, { status: 500 })
   }
 }
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest, { params }: { params: Params }) 
       FROM channels c
       LEFT JOIN users u1 ON c.created_by = u1.user_id
       LEFT JOIN users u2 ON c.chatmate_id = u2.user_id
-      WHERE c.channel_url = $1 AND c.deleted = FALSE
+      WHERE c.channel_url = $1
     `
 
     const result = await pool.query(query, [channelUrl])
